@@ -1,4 +1,3 @@
-// app/build.gradle.kts
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
@@ -20,11 +19,17 @@ android {
 
     buildTypes {
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
+            isShrinkResources = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            // Signing config can be added via environment variables
+        }
+        debug {
+            isMinifyEnabled = false
+            isShrinkResources = false
         }
     }
 
@@ -53,10 +58,8 @@ dependencies {
     // Coroutines
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
     
-    // Video processing - Using mobile-ffmpeg
+    // Video processing
     implementation("com.arthenica:mobile-ffmpeg-full:4.4.LTS")
-    
-    // Media3 for audio/video
     implementation("androidx.media3:media3-exoplayer:1.2.0")
     implementation("androidx.media3:media3-ui:1.2.0")
     implementation("androidx.media3:media3-common:1.2.0")
@@ -69,4 +72,31 @@ dependencies {
     testImplementation("junit:junit:4.13.2")
     androidTestImplementation("androidx.test.ext:junit:1.1.5")
     androidTestImplementation("androidx.test.espresso:espresso-core:3.5.1")
+}
+
+// Add task to verify assets exist
+tasks.register("verifyAssets") {
+    doLast {
+        val assetsDir = file("src/main/assets")
+        if (!assetsDir.exists()) {
+            println("Warning: assets directory doesn't exist, creating it...")
+            assetsDir.mkdirs()
+        }
+        
+        val fontFile = file("src/main/assets/font.ttf")
+        if (!fontFile.exists()) {
+            println("Warning: font.ttf not found in assets!")
+        }
+        
+        val audioFile = file("src/main/assets/bg.mp3")
+        if (!audioFile.exists()) {
+            println("Warning: bg.mp3 not found in assets!")
+        }
+    }
+}
+
+tasks.whenTaskAdded {
+    if (name == "preBuild") {
+        dependsOn("verifyAssets")
+    }
 }
