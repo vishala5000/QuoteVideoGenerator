@@ -11,8 +11,8 @@ on:
 
 env:
   GRADLE_OPTS: "-Dorg.gradle.jvmargs=-Xmx4g -Dorg.gradle.daemon=false"
-  ANDROID_HOME: ${{ runner.home }}/android-sdk
-  ANDROID_SDK_ROOT: ${{ runner.home }}/android-sdk
+  ANDROID_HOME: /home/runner/android-sdk
+  ANDROID_SDK_ROOT: /home/runner/android-sdk
 
 jobs:
   # Job 1: Build and Test
@@ -42,7 +42,7 @@ jobs:
     - name: Setup Android SDK
       uses: android-actions/setup-android@v3
       with:
-        sdk-root: ${{ env.ANDROID_HOME }}
+        sdk-root: /home/runner/android-sdk
         packages: |
           platform-tools
           platforms;android-34
@@ -381,7 +381,7 @@ jobs:
     - name: Setup Android SDK
       uses: android-actions/setup-android@v3
       with:
-        sdk-root: ${{ env.ANDROID_HOME }}
+        sdk-root: /home/runner/android-sdk
         packages: |
           platform-tools
           platforms;android-${{ matrix.api-level }}
