@@ -42,7 +42,8 @@ jobs:
     - name: Setup Android SDK
       uses: android-actions/setup-android@v3
       with:
-        sdk-root: /home/runner/android-sdk
+        # Remove 'sdk-root' as it's not a valid input for this action
+        # The SDK path is set via the ANDROID_HOME environment variable
         packages: |
           platform-tools
           platforms;android-34
@@ -381,7 +382,7 @@ jobs:
     - name: Setup Android SDK
       uses: android-actions/setup-android@v3
       with:
-        sdk-root: /home/runner/android-sdk
+        # Remove 'sdk-root' as it's not a valid input for this action
         packages: |
           platform-tools
           platforms;android-${{ matrix.api-level }}
@@ -464,6 +465,7 @@ jobs:
     - name: Cleanup artifacts
       uses: actions/delete-package-versions@v4
       with:
+        # Ensure the package name matches your GitHub package registry name
         package-name: 'android-quote-video-generator'
         min-versions-to-keep: 5
         delete-only-untagged-versions: true
