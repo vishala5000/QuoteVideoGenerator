@@ -1,1 +1,10 @@
-
+<resources>
+    <string name="app_name">Quote Video Generator</string>
+    <string name="generate_videos">Generate Videos</string>
+    <string name="enter_quotes">Enter quotes (one per line):</string>
+    <string name="processing">Processing...</string>
+    <string name="success">Videos generated successfully!</string>
+    <string name="error">Error generating videos</string>
+    <string name="max_quotes">Maximum 10 quotes allowed</string>
+    <string name="no_quotes">Please enter at least one quote</string>
+</resources>
