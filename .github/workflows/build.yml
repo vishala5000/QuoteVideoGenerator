@@ -1,19 +1,18 @@
-name: Android CI
+name: Android CI/CD
 
 on:
   push:
-    branches: [ main, develop ]
+    branches: [ main, master, develop ]
   pull_request:
-    branches: [ main ]
-  release:
-    types: [ created ]
+    branches: [ main, master ]
+  workflow_dispatch:  # Allow manual trigger
 
 jobs:
   build:
     runs-on: ubuntu-latest
     
     steps:
-    - name: Checkout code
+    - name: Checkout repository
       uses: actions/checkout@v4
     
     - name: Set up JDK 17
@@ -30,6 +29,21 @@ jobs:
         echo "sdk.dir=$ANDROID_HOME" > local.properties
         echo "build.dir=${{ github.workspace }}/build" >> local.properties
     
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          build-essential \
+          libssl-dev \
+          libffi-dev \
+          python3-dev \
+          python3-pip
+    
+    - name: Validate Gradle wrapper
+      run: |
+        chmod +x gradlew
+        ./gradlew --version
+    
     - name: Cache Gradle packages
       uses: actions/cache@v3
       with:
@@ -40,72 +54,119 @@ jobs:
         restore-keys: |
           ${{ runner.os }}-gradle-
     
-    - name: Grant execute permission for gradlew
-      run: chmod +x gradlew
+    - name: Create placeholder assets (if missing)
+      run: |
+        mkdir -p app/src/main/assets
+        # Create placeholder font if missing
+        if [ ! -f app/src/main/assets/font.ttf ]; then
+          echo "Creating placeholder font file..."
+          # Download a free font
+          curl -L -o app/src/main/assets/font.ttf \
+            https://github.com/google/fonts/raw/main/ofl/roboto/Roboto-Regular.ttf
+        fi
+        # Create placeholder audio if missing
+        if [ ! -f app/src/main/assets/bg.mp3 ]; then
+          echo "Creating placeholder audio file..."
+          # Create a silent MP3 (simple approach - will be replaced by actual file)
+          ffmpeg -f lavfi -i anullsrc=r=44100:cl=mono -t 5 -q:a 9 -acodec libmp3lame \
+            app/src/main/assets/bg.mp3 || echo "Placeholder audio not created"
+        fi
     
-    - name: Build APK
-      run: ./gradlew assembleDebug --no-daemon
+    - name: Build Debug APK
+      run: ./gradlew assembleDebug --no-daemon --stacktrace
     
     - name: Build Release APK
-      run: ./gradlew assembleRelease --no-daemon
+      run: ./gradlew assembleRelease --no-daemon --stacktrace
+    
+    - name: Run tests
+      run: ./gradlew test --no-daemon
+    
+    - name: Run lint
+      run: ./gradlew lint --no-daemon
     
     - name: Upload Debug APK
       uses: actions/upload-artifact@v4
       with:
         name: app-debug
-        path: app/build/outputs/apk/debug/app-debug.apk
+        path: app/build/outputs/apk/debug/*.apk
+        retention-days: 30
     
     - name: Upload Release APK
       uses: actions/upload-artifact@v4
       with:
         name: app-release
-        path: app/build/outputs/apk/release/app-release.apk
+        path: app/build/outputs/apk/release/*.apk
+        retention-days: 30
     
-    - name: Run tests
-      run: ./gradlew test
-    
-    - name: Generate Dependencies Report
-      run: ./gradlew dependencies > dependencies.txt
-    
-    - name: Upload Dependencies Report
+    - name: Upload test results
       uses: actions/upload-artifact@v4
       with:
-        name: dependencies-report
-        path: dependencies.txt
+        name: test-results
+        path: app/build/reports/tests/
+        retention-days: 14
     
-    - name: Check Lint
-      run: ./gradlew lint
-    
-    - name: Upload Lint Report
+    - name: Upload lint report
       uses: actions/upload-artifact@v4
       with:
         name: lint-report
         path: app/build/reports/lint-results.html
+        retention-days: 14
+    
+    - name: Generate build summary
+      run: |
+        echo "## Build Summary" >> $GITHUB_STEP_SUMMARY
+        echo "✅ Build completed successfully" >> $GITHUB_STEP_SUMMARY
+        echo "📱 Debug APK: app-debug" >> $GITHUB_STEP_SUMMARY
+        echo "📱 Release APK: app-release" >> $GITHUB_STEP_SUMMARY
+        echo "📊 APK Size:" >> $GITHUB_STEP_SUMMARY
+        ls -lh app/build/outputs/apk/debug/*.apk | awk '{print "- " $9 ": " $5}' >> $GITHUB_STEP_SUMMARY
+        ls -lh app/build/outputs/apk/release/*.apk | awk '{print "- " $9 ": " $5}' >> $GITHUB_STEP_SUMMARY
 
-  deploy:
+  release:
     needs: build
     runs-on: ubuntu-latest
-    if: github.event_name == 'release'
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
     
     steps:
     - name: Download Release APK
       uses: actions/download-artifact@v4
       with:
         name: app-release
-        
+        path: release-apk
+    
     - name: Create Release
       uses: softprops/action-gh-release@v1
       with:
-        files: app-release.apk
-        name: Release ${{ github.ref_name }}
+        files: release-apk/*.apk
+        name: Release ${{ github.sha }}
+        tag_name: v1.0.${{ github.run_number }}
         body: |
-          ## Quote Video Generator
-          Version: ${{ github.ref_name }}
+          ## Quote Video Generator - Automatic Build
           
-          ### Features:
-          - Generate videos from quotes
-          - Custom font support
-          - Background music
-          - ZIP file output
+          ### Build Details
+          - **Build Number**: ${{ github.run_number }}
+          - **Commit**: ${{ github.sha }}
+          - **Branch**: ${{ github.ref_name }}
+          - **Date**: ${{ github.event.head_commit.timestamp }}
+          
+          ### Features
+          - ✅ Video generation from quotes
+          - ✅ Custom font support
+          - ✅ Background music
+          - ✅ ZIP file output
+          - ✅ H.264 (AVC) codec
+          - ✅ 1080x1920 resolution
+          
+          ### How to Use
+          1. Install the APK on your Android device
+          2. Open the app and enter quotes
+          3. Tap "Generate Videos"
+          4. Find the ZIP file in Downloads folder
+          
+          ### Note
+          This is an automatic build from GitHub Actions.
+          Please report any issues in the Issues section.
+        draft: false
+        prerelease: false
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
