@@ -5,9 +5,9 @@ on:
     branches: [ main, master, develop ]
   pull_request:
     branches: [ main, master ]
-  workflow_dispatch:  # Manual trigger from GitHub UI
+  workflow_dispatch:
   schedule:
-    - cron: '0 0 * * 0'  # Weekly build every Sunday at midnight
+    - cron: '0 0 * * 0'
 
 env:
   GRADLE_OPTS: "-Dorg.gradle.jvmargs=-Xmx4g -Dorg.gradle.daemon=false"
@@ -27,13 +27,11 @@ jobs:
         target: [default]
     
     steps:
-    # Step 1: Checkout code
     - name: Checkout repository
       uses: actions/checkout@v4
       with:
         fetch-depth: 0
     
-    # Step 2: Set up JDK
     - name: Set up JDK 17
       uses: actions/setup-java@v4
       with:
@@ -41,7 +39,6 @@ jobs:
         distribution: 'temurin'
         cache: 'gradle'
     
-    # Step 3: Setup Android SDK
     - name: Setup Android SDK
       uses: android-actions/setup-android@v3
       with:
@@ -52,7 +49,6 @@ jobs:
           extras;google;m2repository
           extras;android;m2repository
     
-    # Step 4: Install system dependencies
     - name: Install system dependencies
       run: |
         sudo apt-get update
@@ -67,14 +63,12 @@ jobs:
           curl \
           unzip
     
-    # Step 5: Create local.properties
     - name: Create local.properties
       run: |
         echo "sdk.dir=$ANDROID_HOME" > local.properties
         echo "build.dir=${{ github.workspace }}/build" >> local.properties
         cat local.properties
     
-    # Step 6: Cache Gradle
     - name: Cache Gradle packages
       uses: actions/cache@v3
       with:
@@ -86,33 +80,28 @@ jobs:
         restore-keys: |
           ${{ runner.os }}-gradle-
     
-    # Step 7: Validate Gradle wrapper
     - name: Validate Gradle wrapper
       run: |
         chmod +x gradlew
         ./gradlew --version
     
-    # Step 8: Setup assets (font and audio)
     - name: Setup project assets
       run: |
         echo "Setting up assets..."
         mkdir -p app/src/main/assets
         
-        # Download Roboto font if missing
         if [ ! -f "app/src/main/assets/font.ttf" ]; then
           echo "Downloading Roboto font..."
           curl -L -o app/src/main/assets/font.ttf \
             "https://github.com/google/fonts/raw/main/ofl/roboto/Roboto-Regular.ttf" \
             --retry 5 --retry-delay 2 || echo "Font download failed, creating placeholder"
           
-          # Create placeholder if download failed
           if [ ! -f "app/src/main/assets/font.ttf" ]; then
             echo "Creating placeholder font..."
             echo "Placeholder" > app/src/main/assets/font.ttf
           fi
         fi
         
-        # Create placeholder audio if missing
         if [ ! -f "app/src/main/assets/bg.mp3" ]; then
           echo "Creating placeholder audio file..."
           if command -v ffmpeg &> /dev/null; then
@@ -127,7 +116,6 @@ jobs:
         echo "Assets directory contents:"
         ls -la app/src/main/assets/
     
-    # Step 9: Build Debug APK
     - name: Build Debug APK
       run: |
         ./gradlew assembleDebug \
@@ -137,7 +125,6 @@ jobs:
           --max-workers=2
       continue-on-error: false
     
-    # Step 10: Build Release APK
     - name: Build Release APK
       run: |
         ./gradlew assembleRelease \
@@ -147,7 +134,6 @@ jobs:
           --max-workers=2
       continue-on-error: false
     
-    # Step 11: Run unit tests
     - name: Run unit tests
       run: |
         ./gradlew test \
@@ -156,7 +142,6 @@ jobs:
           --info
       continue-on-error: true
     
-    # Step 12: Run Android instrumentation tests (if emulator available)
     - name: Run Android tests
       uses: reactivecircus/android-emulator-runner@v2
       with:
@@ -167,14 +152,12 @@ jobs:
         script: ./gradlew connectedAndroidTest --no-daemon --stacktrace
       continue-on-error: true
     
-    # Step 13: Run Lint
     - name: Run Lint
       run: |
         ./gradlew lint \
           --no-daemon \
           --stacktrace
     
-    # Step 14: Check APK size
     - name: Check APK sizes
       run: |
         echo "## APK Size Information" >> $GITHUB_STEP_SUMMARY
@@ -189,7 +172,6 @@ jobs:
           echo "| $type | $name | $size |" >> $GITHUB_STEP_SUMMARY
         done
     
-    # Step 15: Upload Debug APK
     - name: Upload Debug APK
       uses: actions/upload-artifact@v4
       with:
@@ -198,7 +180,6 @@ jobs:
         retention-days: 30
         compression-level: 9
     
-    # Step 16: Upload Release APK
     - name: Upload Release APK
       uses: actions/upload-artifact@v4
       with:
@@ -207,7 +188,6 @@ jobs:
         retention-days: 30
         compression-level: 9
     
-    # Step 17: Upload test results
     - name: Upload test results
       uses: actions/upload-artifact@v4
       with:
@@ -217,7 +197,6 @@ jobs:
           app/build/reports/androidTests/
         retention-days: 14
     
-    # Step 18: Upload Lint report
     - name: Upload Lint report
       uses: actions/upload-artifact@v4
       with:
@@ -225,7 +204,6 @@ jobs:
         path: app/build/reports/lint-results.html
         retention-days: 14
     
-    # Step 19: Generate build summary
     - name: Generate build summary
       run: |
         echo "# 🎬 Quote Video Generator - Build Summary" >> $GITHUB_STEP_SUMMARY
@@ -256,20 +234,17 @@ jobs:
     timeout-minutes: 10
     
     steps:
-    # Step 1: Checkout code
     - name: Checkout repository
       uses: actions/checkout@v4
       with:
         fetch-depth: 0
     
-    # Step 2: Download Release APK
     - name: Download Release APK
       uses: actions/download-artifact@v4
       with:
         name: app-release-${{ github.sha }}
         path: release-apk
     
-    # Step 3: Generate release notes
     - name: Generate release notes
       id: release_notes
       run: |
@@ -309,24 +284,18 @@ jobs:
         - Replace `bg.mp3` with your background music
         - Modify colors in `res/values/colors.xml`
         
-        ### 🐛 Known Issues
-        - None reported yet. Please create an issue if you find one!
-        
         ### 📊 Build Information
         - **Build Number**: ${{ github.run_number }}
         - **Commit**: ${{ github.sha }}
         - **Branch**: ${{ github.ref_name }}
         - **Triggered**: ${{ github.event_name }}
-        - **Date**: $(date)
         
         ### 👥 Contributors
         - Automatic build from GitHub Actions
-        - Created by the community
         EOF
         
         echo "RELEASE_NOTES=$(cat release_notes.md)" >> $GITHUB_OUTPUT
     
-    # Step 4: Create Release
     - name: Create GitHub Release
       uses: softprops/action-gh-release@v1
       with:
@@ -341,14 +310,13 @@ jobs:
         generate_release_notes: true
         token: ${{ secrets.GITHUB_TOKEN }}
     
-    # Step 5: Notify on release
     - name: Notify release completion
       run: |
         echo "✅ Release created successfully!"
         echo "📱 APK available for download"
         echo "🔗 Release URL: https://github.com/${{ github.repository }}/releases/tag/v1.0.${{ github.run_number }}"
 
-  # Job 3: Security Scan (Optional)
+  # Job 3: Security Scan
   security:
     name: Security Scan
     needs: build
@@ -357,11 +325,9 @@ jobs:
     timeout-minutes: 15
     
     steps:
-    # Step 1: Checkout code
     - name: Checkout repository
       uses: actions/checkout@v4
     
-    # Step 2: Run CodeQL Analysis
     - name: Initialize CodeQL
       uses: github/codeql-action/init@v2
       with:
@@ -370,19 +336,16 @@ jobs:
     - name: Perform CodeQL Analysis
       uses: github/codeql-action/analyze@v2
     
-    # Step 3: Check dependencies for vulnerabilities
     - name: Check dependencies
       run: |
         echo "Checking for vulnerable dependencies..."
         ./gradlew dependencies > dependencies.txt
         
-        # Check for known vulnerabilities (simplified)
         echo "## Security Check Results" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
         echo "✅ No critical vulnerabilities found" >> $GITHUB_STEP_SUMMARY
         echo "📊 Dependency count: $(grep -c "---" dependencies.txt || echo 0)" >> $GITHUB_STEP_SUMMARY
     
-    # Step 4: Upload security report
     - name: Upload security report
       uses: actions/upload-artifact@v4
       with:
@@ -390,7 +353,7 @@ jobs:
         path: dependencies.txt
         retention-days: 30
 
-  # Job 4: Build Matrix (Test different configurations)
+  # Job 4: Test Matrix
   test-matrix:
     name: Test Matrix
     needs: build
@@ -405,18 +368,15 @@ jobs:
         target: [default]
     
     steps:
-    # Step 1: Checkout code
     - name: Checkout repository
       uses: actions/checkout@v4
     
-    # Step 2: Set up JDK
     - name: Set up JDK 17
       uses: actions/setup-java@v4
       with:
         java-version: '17'
         distribution: 'temurin'
     
-    # Step 3: Setup Android SDK
     - name: Setup Android SDK
       uses: android-actions/setup-android@v3
       with:
@@ -425,12 +385,10 @@ jobs:
           platforms;android-${{ matrix.api-level }}
           build-tools;34.0.0
     
-    # Step 4: Create local.properties
     - name: Create local.properties
       run: |
         echo "sdk.dir=$ANDROID_HOME" > local.properties
     
-    # Step 5: Run tests on emulator
     - name: Run tests on API ${{ matrix.api-level }}
       uses: reactivecircus/android-emulator-runner@v2
       with:
@@ -442,7 +400,6 @@ jobs:
           ./gradlew connectedAndroidTest --no-daemon --stacktrace
           ./gradlew test --no-daemon --stacktrace
     
-    # Step 6: Upload test results per API level
     - name: Upload test results for API ${{ matrix.api-level }}
       uses: actions/upload-artifact@v4
       with:
@@ -450,140 +407,61 @@ jobs:
         path: app/build/reports/androidTests/
         retention-days: 14
 
-# Job 5: Performance Metrics
-performance:
-  name: Performance Metrics
-  needs: build
-  runs-on: ubuntu-latest
-  if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-  timeout-minutes: 10
-  
-  steps:
-  # Step 1: Checkout code
-  - name: Checkout repository
-    uses: actions/checkout@v4
-  
-  # Step 2: Download Debug APK
-  - name: Download Debug APK
-    uses: actions/download-artifact@v4
-    with:
-      name: app-debug-${{ github.sha }}
-      path: debug-apk
-  
-  # Step 3: Analyze APK
-  - name: Analyze APK
-    run: |
-      echo "## 📊 Performance Metrics" >> $GITHUB_STEP_SUMMARY
-      echo "" >> $GITHUB_STEP_SUMMARY
-      echo "### APK Information" >> $GITHUB_STEP_SUMMARY
-      
-      if [ -f debug-apk/*.apk ]; then
-        APK_SIZE=$(ls -lh debug-apk/*.apk | awk '{print $5}')
-        APK_NAME=$(ls debug-apk/*.apk | xargs basename)
-        echo "- **File**: $APK_NAME" >> $GITHUB_STEP_SUMMARY
-        echo "- **Size**: $APK_SIZE" >> $GITHUB_STEP_SUMMARY
-        echo "- **MD5**: $(md5sum debug-apk/*.apk | awk '{print $1}')" >> $GITHUB_STEP_SUMMARY
-        
-        # Estimate installation size
-        INSTALL_SIZE=$(($(stat -c%s debug-apk/*.apk) / 3))
-        echo "- **Estimated Install Size**: $((INSTALL_SIZE / 1024 / 1024)) MB" >> $GITHUB_STEP_SUMMARY
-      else
-        echo "❌ APK not found" >> $GITHUB_STEP_SUMMARY
-      fi
-      
-      echo "" >> $GITHUB_STEP_SUMMARY
-      echo "### 📱 Compatibility" >> $GITHUB_STEP_SUMMARY
-      echo "- ✅ Android 7.0+ (API 24+)" >> $GITHUB_STEP_SUMMARY
-      echo "- ✅ Minimum RAM: 2GB" >> $GITHUB_STEP_SUMMARY
-      echo "- ✅ Storage: 100MB+ free" >> $GITHUB_STEP_SUMMARY
-
-# Optional: Clean up old artifacts
-cleanup:
-  name: Cleanup Old Artifacts
-  runs-on: ubuntu-latest
-  if: always()
-  needs: [build, release, security, test-matrix, performance]
-  timeout-minutes: 5
-  
-  steps:
-  - name: Cleanup artifacts
-    uses: actions/delete-package-versions@v4
-    with:
-      package-name: 'android-quote-video-generator'
-      min-versions-to-keep: 5
-      delete-only-untagged-versions: true        name: app-release
-        path: app/build/outputs/apk/release/*.apk
-        retention-days: 30
-    
-    - name: Upload test results
-      uses: actions/upload-artifact@v4
-      with:
-        name: test-results
-        path: app/build/reports/tests/
-        retention-days: 14
-    
-    - name: Upload lint report
-      uses: actions/upload-artifact@v4
-      with:
-        name: lint-report
-        path: app/build/reports/lint-results.html
-        retention-days: 14
-    
-    - name: Generate build summary
-      run: |
-        echo "## Build Summary" >> $GITHUB_STEP_SUMMARY
-        echo "✅ Build completed successfully" >> $GITHUB_STEP_SUMMARY
-        echo "📱 Debug APK: app-debug" >> $GITHUB_STEP_SUMMARY
-        echo "📱 Release APK: app-release" >> $GITHUB_STEP_SUMMARY
-        echo "📊 APK Size:" >> $GITHUB_STEP_SUMMARY
-        ls -lh app/build/outputs/apk/debug/*.apk | awk '{print "- " $9 ": " $5}' >> $GITHUB_STEP_SUMMARY
-        ls -lh app/build/outputs/apk/release/*.apk | awk '{print "- " $9 ": " $5}' >> $GITHUB_STEP_SUMMARY
-
-  release:
+  # Job 5: Performance Metrics
+  performance:
+    name: Performance Metrics
     needs: build
     runs-on: ubuntu-latest
-    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    timeout-minutes: 10
     
     steps:
-    - name: Download Release APK
+    - name: Checkout repository
+      uses: actions/checkout@v4
+    
+    - name: Download Debug APK
       uses: actions/download-artifact@v4
       with:
-        name: app-release
-        path: release-apk
+        name: app-debug-${{ github.sha }}
+        path: debug-apk
     
-    - name: Create Release
-      uses: softprops/action-gh-release@v1
+    - name: Analyze APK
+      run: |
+        echo "## 📊 Performance Metrics" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### APK Information" >> $GITHUB_STEP_SUMMARY
+        
+        if [ -f debug-apk/*.apk ]; then
+          APK_SIZE=$(ls -lh debug-apk/*.apk | awk '{print $5}')
+          APK_NAME=$(ls debug-apk/*.apk | xargs basename)
+          echo "- **File**: $APK_NAME" >> $GITHUB_STEP_SUMMARY
+          echo "- **Size**: $APK_SIZE" >> $GITHUB_STEP_SUMMARY
+          echo "- **MD5**: $(md5sum debug-apk/*.apk | awk '{print $1}')" >> $GITHUB_STEP_SUMMARY
+          
+          INSTALL_SIZE=$(($(stat -c%s debug-apk/*.apk) / 3))
+          echo "- **Estimated Install Size**: $((INSTALL_SIZE / 1024 / 1024)) MB" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "❌ APK not found" >> $GITHUB_STEP_SUMMARY
+        fi
+        
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### 📱 Compatibility" >> $GITHUB_STEP_SUMMARY
+        echo "- ✅ Android 7.0+ (API 24+)" >> $GITHUB_STEP_SUMMARY
+        echo "- ✅ Minimum RAM: 2GB" >> $GITHUB_STEP_SUMMARY
+        echo "- ✅ Storage: 100MB+ free" >> $GITHUB_STEP_SUMMARY
+
+  # Job 6: Cleanup Old Artifacts
+  cleanup:
+    name: Cleanup Old Artifacts
+    runs-on: ubuntu-latest
+    if: always()
+    needs: [build, release, security, test-matrix, performance]
+    timeout-minutes: 5
+    
+    steps:
+    - name: Cleanup artifacts
+      uses: actions/delete-package-versions@v4
       with:
-        files: release-apk/*.apk
-        name: Release ${{ github.sha }}
-        tag_name: v1.0.${{ github.run_number }}
-        body: |
-          ## Quote Video Generator - Automatic Build
-          
-          ### Build Details
-          - **Build Number**: ${{ github.run_number }}
-          - **Commit**: ${{ github.sha }}
-          - **Branch**: ${{ github.ref_name }}
-          - **Date**: ${{ github.event.head_commit.timestamp }}
-          
-          ### Features
-          - ✅ Video generation from quotes
-          - ✅ Custom font support
-          - ✅ Background music
-          - ✅ ZIP file output
-          - ✅ H.264 (AVC) codec
-          - ✅ 1080x1920 resolution
-          
-          ### How to Use
-          1. Install the APK on your Android device
-          2. Open the app and enter quotes
-          3. Tap "Generate Videos"
-          4. Find the ZIP file in Downloads folder
-          
-          ### Note
-          This is an automatic build from GitHub Actions.
-          Please report any issues in the Issues section.
-        draft: false
-        prerelease: false
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        package-name: 'android-quote-video-generator'
+        min-versions-to-keep: 5
+        delete-only-untagged-versions: true
